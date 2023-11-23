@@ -7,22 +7,23 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    networks:
-      - weather-app-net
     depends_on:
       - redis
+    environment:
+      - PORT=3000   
+      - REDIS_HOST=redis
+      - REDIS_EXPIRATION=60
+      - API_KEY=ff8c5ab4b4mshd67ebae6539aed1p10679ajsn0f607079bcaf
+      - CITY=Tehran
   redis:
+    hostname: redis
     image: "redis:7-alpine"
     ports:
       - "6379:6379"
-    networks:
-      - weather-app-net
     volumes:
       - redis-data:/data
-
-networks:
-  weather-app-net:
-    driver: bridge
+    environment:
+      - REDIS_EXPIRATION=${REDIS_EXPIRATION:-300}
 
 volumes:
   redis-data:
