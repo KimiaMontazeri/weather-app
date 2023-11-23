@@ -1,9 +1,9 @@
 import axios from "axios";
-import { createClient, RedisClientType, RedisClientOptions } from "redis";
+import { createClient } from "redis";
 import express, { Request, Response } from "express";
 
+// envs
 const PORT: number = parseInt(process.env.PORT || "3000", 10);
-const REDIS_PORT: number = parseInt(process.env.REDIS_PORT || "6379", 10);
 const REDIS_HOST: string = process.env.REDIS_HOST || "redis";
 const REDIS_EXPIRATION: number = parseInt(
   process.env.REDIS_EXPIRATION || "30",
@@ -13,11 +13,12 @@ const API_KEY: string =
   process.env.API_KEY || "ff8c5ab4b4mshd67ebae6539aed1p10679ajsn0f607079bcaf";
 const CITY: string = process.env.CITY || "Tehran";
 
+// constants
+const REDIS_PORT = 6379;
+const REDIS_URL = `redis://${REDIS_HOST}:${REDIS_PORT}`;
+
 const redisClient = createClient({
-  socket: {
-    host: REDIS_HOST,
-    port: REDIS_PORT,
-  },
+  url: REDIS_URL,
 });
 
 const API_ENDPOINT: string =
@@ -26,6 +27,17 @@ const API_ENDPOINT: string =
 interface WeatherData {
   maxTemp: number;
   minTemp: number;
+}
+
+async function connectToRedisClient() {
+  await redisClient
+    .connect()
+    .then(() => {
+      console.log("Successfully connected to redis.");
+    })
+    .catch((error) => {
+      throw new Error(error);
+    });
 }
 
 function getWeather(city: string): Promise<any> {
@@ -41,40 +53,48 @@ async function getCachedWeather(
   city: string,
   callback: (cachedData: WeatherData | null) => void
 ): Promise<void> {
-  const result = await redisClient.get(city);
-  if (result) {
-    const { maxTemp, minTemp } = JSON.parse(result);
-    // const now = Date.now();
-
-    // if (now - timestamp < REDIS_EXPIRATION * 1000) {
-    //   console.log(`Using cached data for ${city}`);
-    //   callback({ maxTemp, minTemp });
-    // } else {
-    //   console.log(`Cache expired for ${city}`);
-    //   callback(null);
-    // }
-
-    console.log(`Using cached data for ${city}`);
-    callback({ maxTemp, minTemp });
-  }
-  console.log(`No cache found for ${city}`);
-  callback(null);
+  await redisClient
+    .get(city)
+    .then((result) => {
+      if (result) {
+        const { maxTemp, minTemp } = JSON.parse(result);
+        console.log(`Using cached data for ${city}`);
+        callback({ maxTemp, minTemp });
+      } else {
+        callback(null);
+      }
+    })
+    .catch((error) => {
+      console.log(`No cache found for ${city}. ${error}`);
+      callback(null);
+    });
 }
 
-function cacheWeather(city: string, maxTemp: number, minTemp: number): void {
+async function cacheWeather(
+  city: string,
+  maxTemp: number,
+  minTemp: number
+): Promise<void> {
   const data: WeatherData = {
     maxTemp,
     minTemp,
   };
 
-  redisClient.setEx(city, REDIS_EXPIRATION, JSON.stringify(data));
-  redisClient.expire(city, REDIS_EXPIRATION);
+  await redisClient
+    .setEx(city, REDIS_EXPIRATION, JSON.stringify(data))
+    .then(() => {
+      console.log(`Successfully cached weather data of ${city}`);
+    })
+    .catch((error) => {
+      console.log(
+        `Error ocurred while caching the weather of ${city}. ${error}`
+      );
+    });
 }
 
 const app: express.Application = express();
 
 app.get("/", async (req: Request, res: Response) => {
-  //   const city: string = req.params.city;
   const city = CITY;
 
   getCachedWeather(city, async (cachedData) => {
@@ -86,7 +106,7 @@ app.get("/", async (req: Request, res: Response) => {
     } else {
       try {
         const response = await getWeather(city);
-        const { max_temp, min_temp } = response.data.data[0];
+        const { max_temp, min_temp } = response.data;
 
         res.send({
           maxTemp: max_temp,
@@ -101,6 +121,8 @@ app.get("/", async (req: Request, res: Response) => {
     }
   });
 });
+
+connectToRedisClient();
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
