@@ -17,6 +17,12 @@ services:
       - "6379:6379"
     networks:
       - weather-app-net
+    volumes:
+      - redis-data:/data
+
 networks:
   weather-app-net:
     driver: bridge
+
+volumes:
+  redis-data:
