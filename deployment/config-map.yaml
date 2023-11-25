@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weather-app-config
+  namespace: weather
+data:
+  PORT: '3000'   
+  REDIS_HOST: redis-service
+  REDIS_EXPIRATION: '60'
+  API_KEY: ff8c5ab4b4mshd67ebae6539aed1p10679ajsn0f607079bcaf
+  CITY: Tehran
