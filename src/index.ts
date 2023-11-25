@@ -1,6 +1,7 @@
 import axios from "axios";
 import { createClient } from "redis";
 import express, { Request, Response } from "express";
+import os from "os";
 
 // envs
 const PORT: number = parseInt(process.env.PORT || "3000", 10);
@@ -102,6 +103,7 @@ app.get("/", async (req: Request, res: Response) => {
       res.send({
         maxTemp: cachedData.maxTemp,
         minTemp: cachedData.minTemp,
+        hostname: os.hostname(),
       });
     } else {
       try {
@@ -111,6 +113,7 @@ app.get("/", async (req: Request, res: Response) => {
         res.send({
           maxTemp: max_temp,
           minTemp: min_temp,
+          hostname: os.hostname(),
         });
 
         cacheWeather(city, max_temp, min_temp);
